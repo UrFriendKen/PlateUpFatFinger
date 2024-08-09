@@ -1,7 +1,9 @@
 ﻿using HarmonyLib;
 using Kitchen;
+using KitchenData;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Reflection.Emit;
 using UnityEngine;
 
@@ -17,12 +19,8 @@ namespace KitchenFatFinger
             OpCodes.Call,
             OpCodes.Ldstr,
             OpCodes.Callvirt,
-            OpCodes.Ldarg_0,
-            OpCodes.Ldftn,
-            OpCodes.Newobj,
-            OpCodes.Ldc_I4_0,
-            OpCodes.Ldc_R4,
-            OpCodes.Ldc_R4,
+            OpCodes.Ldc_I4_S,
+            OpCodes.Call,
             OpCodes.Callvirt,
             OpCodes.Pop
         };
@@ -33,9 +31,6 @@ namespace KitchenFatFinger
             null,
             null,
             "MENU_QUIT_TO_LOBBY",
-            null,
-            null,
-            null,
             null,
             null,
             null,
@@ -53,10 +48,6 @@ namespace KitchenFatFinger
             OpCodes.Nop,
             OpCodes.Nop,
             OpCodes.Nop,
-            OpCodes.Nop,
-            OpCodes.Nop,
-            OpCodes.Nop,
-            OpCodes.Nop,
             OpCodes.Nop
         };
 
@@ -65,10 +56,31 @@ namespace KitchenFatFinger
         };
 
         const int EXPECTED_MATCH_COUNT = 1;
+        static MainMenu _instance;
+        static MethodInfo m_AddActionButton = typeof(Menu<MenuAction>).GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
+            .Where(delegate (MethodInfo candidate) {
+                return candidate.Name == "AddActionButton" &&
+                    candidate.GetParameters().Count() == 2;
+                })
+            .FirstOrDefault();
+
+        [HarmonyPatch(typeof(MainMenu), nameof(MainMenu.Setup))]
+        [HarmonyPrefix]
+        static void Setup_Prefix(ref MainMenu __instance)
+        {
+            _instance = __instance;
+            if (GameInfo.CurrentScene == SceneType.Kitchen)
+                AddActionButton(__instance);
+        }
+
+        static void AddActionButton(MainMenu instance)
+        {
+            m_AddActionButton?.Invoke(instance, new object[] { GameData.Main.GlobalLocalisation["MENU_QUIT_TO_LOBBY"], new MenuAction(PauseMenuAction.QuitToLobby) });
+        }
 
         [HarmonyPatch(typeof(MainMenu), nameof(MainMenu.Setup))]
         [HarmonyTranspiler]
-        static IEnumerable<CodeInstruction> OnUpdate_Transpiler(IEnumerable<CodeInstruction> instructions)
+        static IEnumerable<CodeInstruction> Setup_Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             Main.LogInfo("MainMenu Transpiler");
             Main.LogInfo("Attempt remove original Return to HQ button");
